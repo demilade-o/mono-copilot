@@ -9,8 +9,9 @@ RUN apk add --no-cache bash curl ca-certificates unzip xz git
 RUN curl -LsSf https://astral.sh/uv/install.sh | \
     UV_UNMANAGED_INSTALL=/usr/local/bin UV_NO_MODIFY_PATH=1 sh
 
-RUN curl -fsSL https://bun.sh/install | \
-    BUN_INSTALL=/usr/local bash -s -- bun-v${BUN_VERSION}
+RUN curl -fsSL https://bun.sh/install | bash -s -- bun-v${BUN_VERSION} \
+    && mv /root/.bun/bin/bun /usr/local/bin/bun \
+    && rm -rf /root/.bun
 
 RUN uv --version && bun --version && python --version
 
