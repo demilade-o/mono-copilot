@@ -209,13 +209,6 @@ async def export_project(request: ExportRequest) -> dict:
 
     try:
         entries = await sandbox.ls(project_dir)
-        # TEMP DEBUG — remove later
-        print("EXPORT DEBUG:", [
-            {"path": getattr(e, "path", None),
-            "is_dir": getattr(e, "is_dir", None),
-            "kind": getattr(e, "kind", None)}
-            for e in entries
-        ])
     except Exception as exc:
         raise HTTPException(
             status_code=404,
