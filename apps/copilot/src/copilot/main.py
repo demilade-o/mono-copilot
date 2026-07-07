@@ -1,5 +1,6 @@
 import os
 from contextlib import asynccontextmanager
+import base64
 
 from agents import Runner
 from agents.run import RunConfig
@@ -194,6 +195,62 @@ async def run_agent(request: AgentRequest) -> AgentResponse:
 
     return AgentResponse(response=str(result.final_output))
 
+class ExportRequest(BaseModel):
+    project: str
+
+
+@app.post("/export")
+async def export_project(request: ExportRequest) -> dict:
+    sandbox = getattr(app.state, "sandbox", None)
+    if sandbox is None:
+        raise HTTPException(status_code=503, detail="Sandbox is not ready yet.")
+
+    project_dir = f"/workspace/projects/{request.project}"
+
+    try:
+        entries = await sandbox.ls(project_dir)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Could not find project '{request.project}' at {project_dir}: {exc}",
+        )
+
+    files = []
+    for entry in entries:
+        # Skip sub-directories; only export regular files.
+        # `kind` is an EntryKind enum whose value is the string "file" for files.
+        kind = getattr(entry, "kind", None)
+        if getattr(kind, "value", str(kind)) != "file":
+            continue
+
+        entry_path = getattr(entry, "path", None)
+        if not entry_path:
+            continue
+
+        # `path` may be just the filename or the full path — handle both.
+        filename = os.path.basename(entry_path)
+        if entry_path.startswith("/"):
+            file_path = entry_path                      # already absolute
+        else:
+            file_path = f"{project_dir}/{filename}"     # relative -> prepend dir
+
+        try:
+            stream = await sandbox.read(file_path)
+            raw = stream.read()
+            if hasattr(raw, "__await__"):   # in case read() is async
+                raw = await raw
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to read {file_path}: {exc}")
+
+        files.append({
+            "name": filename,
+            "content_b64": base64.b64encode(raw).decode("ascii"),
+        })
+
+    if not files:
+        raise HTTPException(status_code=404, detail=f"Project '{request.project}' has no files to export.")
+
+    return {"project": request.project, "files": files}
 
 def run() -> None:
     environment = os.getenv("APP_ENV", "production").lower()
