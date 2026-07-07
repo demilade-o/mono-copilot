@@ -1,5 +1,6 @@
 import os
 from contextlib import asynccontextmanager
+import base64
 
 from agents import Runner
 from agents.run import RunConfig
@@ -194,6 +195,55 @@ async def run_agent(request: AgentRequest) -> AgentResponse:
 
     return AgentResponse(response=str(result.final_output))
 
+class ExportRequest(BaseModel):
+    project: str
+
+
+@app.post("/export")
+async def export_project(request: ExportRequest) -> dict:
+    sandbox = getattr(app.state, "sandbox", None)
+    if sandbox is None:
+        raise HTTPException(status_code=503, detail="Sandbox is not ready yet.")
+
+    project_dir = f"/workspace/projects/{request.project}"
+
+    try:
+        entries = await sandbox.ls(project_dir)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Could not find project '{request.project}' at {project_dir}: {exc}",
+        )
+
+    files = []
+    for entry in entries:
+        # Only export regular files (skip any sub-directories).
+        name = getattr(entry, "name", None)
+        if name is None:
+            continue
+        is_dir = getattr(entry, "is_dir", False)
+        if is_dir:
+            continue
+
+        file_path = f"{project_dir}/{name}"
+        try:
+            stream = await sandbox.read(file_path)
+            raw = stream.read()
+            if hasattr(raw, "__await__"):   # in case read() is async
+                raw = await raw
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to read {file_path}: {exc}")
+
+        files.append({
+            "name": name,
+            # base64 so any bytes survive the JSON round-trip intact
+            "content_b64": base64.b64encode(raw).decode("ascii"),
+        })
+
+    if not files:
+        raise HTTPException(status_code=404, detail=f"Project '{request.project}' has no files to export.")
+
+    return {"project": request.project, "files": files}
 
 def run() -> None:
     environment = os.getenv("APP_ENV", "production").lower()
