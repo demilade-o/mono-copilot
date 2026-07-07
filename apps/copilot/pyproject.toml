@@ -15,6 +15,7 @@ dependencies = [
 [project.scripts]
 mono = "copilot.mono:main"
 start = "copilot.main:run"
+app = "copilot.cli:main"
 
 [tool.uv.sources]
 runtime = { workspace = true }
