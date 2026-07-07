@@ -39,7 +39,7 @@ def _runtime_shim(binary: str) -> File:
 
 
 def _docker_image() -> str:
-    return os.getenv("SANDBOX_DOCKER_IMAGE", "mono-copilot-sandbox:latest")
+    return os.getenv("SANDBOX_DOCKER_IMAGE", "mono-copilot:latest")
 
 
 def _skills_repo() -> GitRepo:
@@ -128,7 +128,7 @@ async def lifespan(app: FastAPI):
                 raise RuntimeError(
                     "Docker sandbox image is missing uv and/or bun. "
                     "Set SANDBOX_DOCKER_IMAGE to an image that includes both runtimes "
-                    "(for example mono-copilot-sandbox:latest). "
+                    "(for example mono-copilot:latest). "
                     f"Preflight error: {stderr}"
                 )
 
