@@ -209,6 +209,13 @@ async def export_project(request: ExportRequest) -> dict:
 
     try:
         entries = await sandbox.ls(project_dir)
+        # TEMP DEBUG — remove later
+        print("EXPORT DEBUG:", [
+            {"path": getattr(e, "path", None),
+            "is_dir": getattr(e, "is_dir", None),
+            "kind": getattr(e, "kind", None)}
+            for e in entries
+        ])
     except Exception as exc:
         raise HTTPException(
             status_code=404,
@@ -218,7 +225,9 @@ async def export_project(request: ExportRequest) -> dict:
     files = []
     for entry in entries:
         # Skip sub-directories; only export regular files.
-        if getattr(entry, "is_dir", False):
+        # `kind` is an EntryKind enum whose value is the string "file" for files.
+        kind = getattr(entry, "kind", None)
+        if getattr(kind, "value", str(kind)) != "file":
             continue
 
         entry_path = getattr(entry, "path", None)
