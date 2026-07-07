@@ -25,6 +25,8 @@ import re
 import sys
 import urllib.error
 import urllib.request
+import base64
+from pathlib import Path
 
 # Where the server is listening. Matches main.py's development host/port.
 BASE_URL = "http://127.0.0.1:8000"
@@ -186,6 +188,57 @@ def list_projects() -> None:
     except RuntimeError as error:
         print(f"[!] {error}")
 
+def export_project() -> None:
+    print("\n=== Export a project to your computer ===")
+    project = ask("Which project? (its folder name, e.g. mtn-nigeria-esim-prepaid)")
+    if not project:
+        print("Cancelled — no project given.")
+        return
+
+    working_message()
+
+    # Ask the server for the project's files (base64-encoded).
+    payload = json.dumps({"project": project}).encode("utf-8")
+    request = urllib.request.Request(
+        f"{BASE_URL}/export",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+            body = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        try:
+            detail = json.loads(error.read().decode("utf-8")).get("detail", str(error))
+        except Exception:
+            detail = str(error)
+        print(f"[!] Could not export: {detail}")
+        return
+    except urllib.error.URLError as error:
+        print(f"[!] Could not reach the server. Is it running? ({error.reason})")
+        return
+
+    files = body.get("files", [])
+    if not files:
+        print("[!] Nothing came back to export.")
+        return
+
+    # Write each file into ~/Downloads/<project>/
+    destination = Path.home() / "Downloads" / project
+    destination.mkdir(parents=True, exist_ok=True)
+
+    saved = []
+    for item in files:
+        name = item["name"]
+        raw = base64.b64decode(item["content_b64"])
+        file_path = destination / name
+        file_path.write_bytes(raw)
+        saved.append(name)
+
+    print(f"\nExported {len(saved)} file(s) to:\n  {destination}")
+    for name in saved:
+        print(f"  - {name}")
 
 def free_form() -> None:
     print("\n=== Ask the assistant (type 'back' to return to the menu) ===")
@@ -216,8 +269,9 @@ What would you like to do?
   1) Create a Business Requirements Document (BRD)
   2) Create a Product Requirements Document (PRD)
   3) List my projects
-  4) Ask the assistant something
-  5) Quit
+  4) Export a project to my computer
+  5) Ask the assistant something
+  6) Quit
 """
 
 
@@ -241,12 +295,14 @@ def main() -> None:
         elif choice == "3":
             list_projects()
         elif choice == "4":
+            export_project()
+        elif choice == "5":
             free_form()
-        elif choice in {"5", "q", "quit", "exit"}:
+        elif choice in {"6", "q", "quit", "exit"}:
             print("Goodbye!")
             return
         else:
-            print("Please enter a number from 1 to 5.")
+            print("Please enter a number from 1 to 6.")
 
 
 if __name__ == "__main__":
