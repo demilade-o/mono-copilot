@@ -1,4 +1,6 @@
 import os
+from contextlib import asynccontextmanager
+
 from agents import Runner
 from agents.run import RunConfig
 from agents.sandbox import (
@@ -77,6 +79,11 @@ agent = SandboxAgent(
     instructions=(
         "You are a coding agent operating inside a sandbox workspace. "
         "Inspect the workspace before making assumptions. "
+        "You have a PERSISTENT project workspace at /workspace/projects that survives across requests. "
+        "Each project lives in its own folder: /workspace/projects/<project-name>/. "
+        "When asked to create or work on a project, create or reuse /workspace/projects/<project-name>/ "
+        "and save that project's documents inside it (for example project-brd.md and project-prd.md). "
+        "Before creating a new project, list /workspace/projects first to see what already exists and avoid duplicates. "
         "When a user asks you to run a one-off script, execute it in the sandbox and report the result. "
         "Runtime policy: run Python scripts with './tools/bin/uv run python <script_or_flags>' and run JavaScript/TypeScript with './tools/bin/bun' (for example './tools/bin/bun run', './tools/bin/bun <file>.js', or './tools/bin/bun <file>.ts'). "
         "Prefer these runtimes over direct python/node execution unless the command fails and you explain why. "
