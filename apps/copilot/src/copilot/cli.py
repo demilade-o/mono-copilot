@@ -287,7 +287,7 @@ def main() -> None:
 
     while True:
         print(MENU)
-        choice = ask("Enter a number (1-5)")
+        choice = ask("Enter a number (1-6)")
         if choice == "1":
             create_brd()
         elif choice == "2":
