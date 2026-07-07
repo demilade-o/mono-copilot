@@ -217,15 +217,21 @@ async def export_project(request: ExportRequest) -> dict:
 
     files = []
     for entry in entries:
-        # Only export regular files (skip any sub-directories).
-        name = getattr(entry, "name", None)
-        if name is None:
-            continue
-        is_dir = getattr(entry, "is_dir", False)
-        if is_dir:
+        # Skip sub-directories; only export regular files.
+        if getattr(entry, "is_dir", False):
             continue
 
-        file_path = f"{project_dir}/{name}"
+        entry_path = getattr(entry, "path", None)
+        if not entry_path:
+            continue
+
+        # `path` may be just the filename or the full path — handle both.
+        filename = os.path.basename(entry_path)
+        if entry_path.startswith("/"):
+            file_path = entry_path                      # already absolute
+        else:
+            file_path = f"{project_dir}/{filename}"     # relative -> prepend dir
+
         try:
             stream = await sandbox.read(file_path)
             raw = stream.read()
@@ -235,8 +241,7 @@ async def export_project(request: ExportRequest) -> dict:
             raise HTTPException(status_code=500, detail=f"Failed to read {file_path}: {exc}")
 
         files.append({
-            "name": name,
-            # base64 so any bytes survive the JSON round-trip intact
+            "name": filename,
             "content_b64": base64.b64encode(raw).decode("ascii"),
         })
 
